@@ -1,0 +1,707 @@
+<title>مدرج المنور</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600&family=Tajawal:wght@400;500;700&display=swap">
+<style>
+/* Layout: full-bleed 3D stage; brand and actions on top, view chips in a bottom dock, dimensions drawer on the start side. */
+:root {
+  --bg: #12161a;
+  --panel: rgba(23, 29, 33, 0.88);
+  --line: #2f3a41;
+  --fg: #e8ecee;
+  --muted: #95a2a9;
+  --accent: #d49b5d;
+  --accent-ink: #1d1307;
+  --given: #8db36b;
+  --font-ui: 'Tajawal', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-num: 'Readex Pro', 'Tajawal', system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#c { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; outline: none; }
+#c.drag { cursor: grabbing; }
+#labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.dim { position: absolute; transform: translate(-50%, -50%); padding: 2px 7px; border-radius: 6px; background: rgba(18, 22, 26, 0.82); border: 1px solid #5b4630; color: #f1cf9f; font: 500 12px/1.3 var(--font-num); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dim.given { border-color: #587545; color: #c5e2a8; }
+.dim.step { padding: 1px 5px; font-size: 11px; }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); box-sizing: border-box; }
+.top { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none; }
+.top > * { pointer-events: auto; }
+.brand { min-width: 0; }
+.brand h1 { margin: 0; font: 600 20px/1.2 var(--font-num); letter-spacing: 0; text-wrap: balance; }
+.brand p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; max-width: 46ch; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.bottom { display: none !important; }
+.dock { display: none !important; }
+.bottom { position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); left: 0; right: 0; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.bottom > * { pointer-events: auto; }
+.hint { margin: 0; color: var(--muted); font-size: 12.5px; text-align: center; text-shadow: 0 1px 2px #000; }
+.dock { display: flex; gap: 8px; overflow-x: auto; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); backdrop-filter: blur(8px); scrollbar-width: none; }
+.dock::-webkit-scrollbar { display: none; }
+.chip { flex: 0 0 auto; min-height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); color: var(--fg); font: 500 14px var(--font-ui); cursor: pointer; }
+.chip:hover { border-color: #51606a; }
+.chip:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip[aria-pressed="true"], .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.top .chip { background: var(--panel); backdrop-filter: blur(8px); }
+.top .chip[aria-pressed="true"] { background: var(--accent); }
+.drawer { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 78px); right: max(16px, env(safe-area-inset-right, 0px)); width: min(330px, calc(100% - 32px)); max-height: calc(100% - 200px); overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); backdrop-filter: blur(10px); padding: 14px; box-sizing: border-box; }
+.drawer h2 { margin: 0 0 6px; font: 600 15px var(--font-num); }
+.drawer .note { margin: 0 0 12px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.row { display: grid; grid-template-columns: 1fr 86px; gap: 4px 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.row label { font-size: 13.5px; }
+.row .tag { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); }
+.row .tag b { display: inline-block; padding: 1px 7px; border-radius: 99px; font-weight: 500; margin-inline-end: 6px; background: rgba(212, 155, 93, 0.16); color: #e7bb88; }
+.row .tag b.g { background: rgba(141, 179, 107, 0.18); color: #b4d695; }
+.row input { width: 100%; box-sizing: border-box; height: 34px; border-radius: 7px; border: 1px solid var(--line); background: #0e1215; color: var(--fg); padding: 0 8px; font: 500 14px var(--font-num); text-align: left; direction: ltr; font-variant-numeric: tabular-nums; }
+.btns { display: flex; gap: 8px; margin-top: 12px; }
+.btns .chip { flex: 1; }
+.movepad { display: none !important; position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); display: none; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(2, 46px); gap: 6px; }
+.movepad button { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--fg); font-size: 18px; touch-action: none; }
+.movepad .a { grid-column: 1; grid-row: 1; } .movepad .z { grid-column: 3; grid-row: 1; } .movepad .u { grid-column: 2; grid-row: 1; } .movepad .l { grid-column: 1; grid-row: 2; } .movepad .d { grid-column: 2; grid-row: 2; } .movepad .r { grid-column: 3; grid-row: 2; }
+@media (pointer: coarse) { body.walk .movepad { display: grid; } }
+@media (max-width: 640px) {
+  .brand p { display: none; }
+  .drawer { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); max-height: 52%; }
+  .actions .chip { padding: 0 10px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<div id="stage"><canvas id="c" tabindex="0" aria-label="مجسم ثلاثي الأبعاد لمدرج المنور"></canvas><div id="labels"></div></div>
+<div class="top gutter">
+  <div class="actions">
+    <button class="chip" id="btnFlex" aria-pressed="true">Hide Ceiling</button>
+  </div>
+</div>
+<div class="bottom gutter">
+  <p class="hint" id="hint"></p>
+  <nav class="dock" id="dock" aria-label="زوايا النظر"></nav>
+</div>
+<div class="movepad" id="pad" aria-hidden="true"><button class="a" data-k="u">⤒</button><button class="u" data-k="f">▲</button><button class="z" data-k="dn">⤓</button><button class="l" data-k="l">◀</button><button class="d" data-k="b">▼</button><button class="r" data-k="r">▶</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/*GEOM-BEGIN*/
+const D2R = Math.PI / 180;
+function newG() { return { p: [], n: [], u: [], i: [] }; }
+function quad(g, P4, N4, U4) {
+  const a = P4[0], b = P4[1], c = P4[2], d = P4[3];
+  const d1 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]], d2 = [d[0] - b[0], d[1] - b[1], d[2] - b[2]];
+  const gx = d1[1] * d2[2] - d1[2] * d2[1], gy = d1[2] * d2[0] - d1[0] * d2[2], gz = d1[0] * d2[1] - d1[1] * d2[0];
+  const nx = N4[0][0] + N4[1][0] + N4[2][0] + N4[3][0];
+  const ny = N4[0][1] + N4[1][1] + N4[2][1] + N4[3][1];
+  const nz = N4[0][2] + N4[1][2] + N4[2][2] + N4[3][2];
+  const ord = (gx * nx + gy * ny + gz * nz) < 0 ? [0, 3, 2, 1] : [0, 1, 2, 3];
+  const base = g.p.length / 3;
+  for (const k of ord) {
+    g.p.push(P4[k][0], P4[k][1], P4[k][2]);
+    g.n.push(N4[k][0], N4[k][1], N4[k][2]);
+    g.u.push(U4[k][0], U4[k][1]);
+  }
+  g.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+}
+function mulberry(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* All dimensions in metres. Plan angle a (degrees): point = (r cos a, r sin a) on the (x, z) plane,
+   x = east, z = south, y = up. */
+function buildModel(P) {
+  const items = [], labels = [], lines = [];
+  const sky = P.sky, R = P.R, H = P.H, shaft = P.shaft, h1 = P.h1, step = P.step, d = P.depth, scrW = P.scrW, scrH = P.scrH;
+  const Hb = H - 0.45;                       // underside of the bulkhead over the glass wall
+  const r0 = R - 0.02 - 3 * d, r1 = r0 + d, r2 = r0 + 2 * d, r3 = r0 + 3 * d;
+  const h2 = h1 + step, h3 = h2 + step;
+  const ac = -17;                            // centre of the seating (degrees)
+  const T1a = [ac - 33, ac + 33], T2a = [ac - 48, ac + 33], T3a = [ac - 62, ac + 46];
+  const a0 = T1a[0], a1 = T1a[1];
+  const WF = [T2a[0], T1a[0]];               // west flight (3 steps up to tier 2)
+  const EF = [T1a[1], T3a[1]];               // east flight (5 steps up to tier 3)
+  const K0 = T3a[1] + 1, K1 = 192, SW = 222; // glass wall range, swoop top, swoop foot
+  const aScreen = 247, aDoor = 105, LT0 = -3;
+  const woodTop = h3 + 0.5;
+  const rnd = mulberry(11);
+  const P3 = (a, r, y) => [r * Math.cos(a * D2R), y, r * Math.sin(a * D2R)];
+  const add = (m, g, out) => { if (g.i.length) items.push({ m, g, out: !!out }); };
+  const F4 = (n) => [n, n, n, n];
+
+  function arcBlock(m, rA, rB, A0, A1, Y0, Y1, faces, out) {
+    faces = faces || 'iote';
+    const g = newG(), n = Math.max(1, Math.ceil(Math.abs(A1 - A0) / 2)), rm = (rA + rB) / 2;
+    for (let k = 0; k < n; k++) {
+      const A = A0 + (A1 - A0) * k / n, B = A0 + (A1 - A0) * (k + 1) / n;
+      const cA = Math.cos(A * D2R), sA = Math.sin(A * D2R), cB = Math.cos(B * D2R), sB = Math.sin(B * D2R);
+      const uA = (A - A0) * D2R * rm, uB = (B - A0) * D2R * rm;
+      if (faces.indexOf('i') >= 0) quad(g, [[rA * cA, Y0, rA * sA], [rA * cB, Y0, rA * sB], [rA * cB, Y1, rA * sB], [rA * cA, Y1, rA * sA]],
+        [[-cA, 0, -sA], [-cB, 0, -sB], [-cB, 0, -sB], [-cA, 0, -sA]], [[uA, Y0], [uB, Y0], [uB, Y1], [uA, Y1]]);
+      if (faces.indexOf('o') >= 0) quad(g, [[rB * cA, Y0, rB * sA], [rB * cB, Y0, rB * sB], [rB * cB, Y1, rB * sB], [rB * cA, Y1, rB * sA]],
+        [[cA, 0, sA], [cB, 0, sB], [cB, 0, sB], [cA, 0, sA]], [[uA, Y0], [uB, Y0], [uB, Y1], [uA, Y1]]);
+      if (faces.indexOf('t') >= 0) quad(g, [[rA * cA, Y1, rA * sA], [rB * cA, Y1, rB * sA], [rB * cB, Y1, rB * sB], [rA * cB, Y1, rA * sB]],
+        F4([0, 1, 0]), [[uA, rA], [uA, rB], [uB, rB], [uB, rA]]);
+      if (faces.indexOf('b') >= 0) quad(g, [[rA * cA, Y0, rA * sA], [rB * cA, Y0, rB * sA], [rB * cB, Y0, rB * sB], [rA * cB, Y0, rA * sB]],
+        F4([0, -1, 0]), [[uA, rA], [uA, rB], [uB, rB], [uB, rA]]);
+    }
+    if (faces.indexOf('e') >= 0) {
+      const ca = Math.cos(A0 * D2R), sa = Math.sin(A0 * D2R), cb = Math.cos(A1 * D2R), sb = Math.sin(A1 * D2R);
+      quad(g, [[rA * ca, Y0, rA * sa], [rB * ca, Y0, rB * sa], [rB * ca, Y1, rB * sa], [rA * ca, Y1, rA * sa]], F4([sa, 0, -ca]), [[rA, Y0], [rB, Y0], [rB, Y1], [rA, Y1]]);
+      quad(g, [[rA * cb, Y0, rA * sb], [rB * cb, Y0, rB * sb], [rB * cb, Y1, rB * sb], [rA * cb, Y1, rA * sb]], F4([-sb, 0, cb]), [[rA, Y0], [rB, Y0], [rB, Y1], [rA, Y1]]);
+    }
+    add(m, g, out);
+  }
+  function ringFace(m, r, A0, A1, Y0, Y1, inward, stepDeg, out) {
+    const g = newG(), n = Math.max(1, Math.ceil(Math.abs(A1 - A0) / (stepDeg || 2)));
+    const s = inward ? -1 : 1;
+    for (let k = 0; k < n; k++) {
+      const A = A0 + (A1 - A0) * k / n, B = A0 + (A1 - A0) * (k + 1) / n;
+      const cA = Math.cos(A * D2R), sA = Math.sin(A * D2R), cB = Math.cos(B * D2R), sB = Math.sin(B * D2R);
+      const uA = (A - A0) * D2R * r, uB = (B - A0) * D2R * r;
+      quad(g, [[r * cA, Y0, r * sA], [r * cB, Y0, r * sB], [r * cB, Y1, r * sB], [r * cA, Y1, r * sA]],
+        [[s * cA, 0, s * sA], [s * cB, 0, s * sB], [s * cB, 0, s * sB], [s * cA, 0, s * sA]], [[uA, Y0], [uB, Y0], [uB, Y1], [uA, Y1]]);
+    }
+    add(m, g, out);
+  }
+  function boxG(m, cx, cy, cz, sx, sy, sz, ang, out) {      // local X = tangent at ring angle ang, local Z = radial
+    const ca = Math.cos(ang * D2R), sa = Math.sin(ang * D2R);
+    const ex = [-sa, 0, ca], ez = [ca, 0, sa];
+    const hx = sx / 2, hy = sy / 2, hz = sz / 2, g = newG();
+    const C = (a, b, c) => [cx + ex[0] * a * hx + ez[0] * c * hz, cy + b * hy, cz + ex[2] * a * hx + ez[2] * c * hz];
+    const face = (pts, n) => quad(g, pts.map(q => C(q[0], q[1], q[2])), F4(n), [[0, 0], [1, 0], [1, 1], [0, 1]]);
+    face([[1, -1, -1], [1, -1, 1], [1, 1, 1], [1, 1, -1]], ex);
+    face([[-1, -1, -1], [-1, -1, 1], [-1, 1, 1], [-1, 1, -1]], [-ex[0], 0, -ex[2]]);
+    face([[-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1]], [0, 1, 0]);
+    face([[-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1]], [0, -1, 0]);
+    face([[-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]], ez);
+    face([[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1]], [-ez[0], 0, -ez[2]]);
+    add(m, g, out);
+  }
+  function blob(m, cx, cy, cz, rx, ry, rz) {
+    const g = newG(), LO = 7, LA = 4;
+    const pt = (i, j) => {
+      const th = (i / LO) * Math.PI * 2, ph = (j / LA) * Math.PI;
+      const x = Math.sin(ph) * Math.cos(th), y = Math.cos(ph), z = Math.sin(ph) * Math.sin(th);
+      return { p: [cx + x * rx, cy + y * ry, cz + z * rz], n: [x / rx, y / ry, z / rz] };
+    };
+    for (let i = 0; i < LO; i++) for (let j = 0; j < LA; j++) {
+      const A = pt(i, j), B = pt(i + 1, j), C = pt(i + 1, j + 1), D = pt(i, j + 1);
+      quad(g, [A.p, B.p, C.p, D.p], [A.n, B.n, C.n, D.n], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+    }
+    add(m, g);
+  }
+  function polar(m, y, rIn, rOut, down, out) {              // flat annulus; rIn/rOut are functions of angle (deg)
+    const g = newG(), n = 360, ny = down ? -1 : 1;
+    for (let k = 0; k < n; k++) {
+      const A = k, B = k + 1, cA = Math.cos(A * D2R), sA = Math.sin(A * D2R), cB = Math.cos(B * D2R), sB = Math.sin(B * D2R);
+      const iA = rIn(A), iB = rIn(B), oA = rOut(A), oB = rOut(B);
+      quad(g, [[iA * cA, y, iA * sA], [oA * cA, y, oA * sA], [oB * cB, y, oB * sB], [iB * cB, y, iB * sB]], F4([0, ny, 0]),
+        [[iA * cA, iA * sA], [oA * cA, oA * sA], [oB * cB, oB * sB], [iB * cB, iB * sB]]);
+    }
+    add(m, g, out);
+  }
+
+  /* ---------- floor (single textured quad, 20 x 20 m) ---------- */
+  { const g = newG();
+    quad(g, [[-10, 0, -10], [10, 0, -10], [10, 0, 10], [-10, 0, 10]], F4([0, 1, 0]), [[0, 1], [1, 1], [1, 0], [0, 0]]);
+    add('floor', g); }
+
+  /* ---------- white curved wall, built column by column ---------- */
+  const lensLo = woodTop, LT1 = K0 - 0.5, LTw = 14;           // low slit above the tier-3 wood panel, from LT0 to the glass wall
+  const ybAt = (a) => {
+    if (a >= K0 && a <= K1) return Hb;
+    if (a > K1 && a < SW) { const u = (SW - a) / (SW - K1); return Hb * Math.sqrt(Math.max(0, 1 - (1 - u) * (1 - u))); }
+    if (a >= LT0 && a < K0) { const t = Math.min(1, (a - LT0) / LTw); return lensLo + (Hb - lensLo) * (1 - (1 - t) * (1 - t)); }
+    return 0;
+  };
+  const dArc = (a, c) => ((a - c + 540) % 360 - 180) * D2R * R;   // signed arc distance in metres
+  const ovalHx = 0.65, ovalHy = 0.36, ovalYc = 1.1;
+  const wOval = (a) => { const x = dArc(a, aScreen); if (Math.abs(x) >= ovalHx) return { lo: ovalYc, hi: ovalYc };
+    const h = ovalHy * Math.sqrt(1 - (x / ovalHx) * (x / ovalHx)); return { lo: ovalYc - h, hi: ovalYc + h }; };
+  { const g = newG(), STEP = 0.2;
+    for (let a = 0; a < 360; a += STEP) {
+      const A = a, B = a + STEP, cA = Math.cos(A * D2R), sA = Math.sin(A * D2R), cB = Math.cos(B * D2R), sB = Math.sin(B * D2R);
+      const yA = ybAt(A + 1e-6), yB = ybAt(B - 1e-6);
+      const wa = wOval(A), wb = wOval(B), has = wa.hi > wa.lo + 1e-6 || wb.hi > wb.lo + 1e-6;
+      const emit = (ya, yb2, za, zb) => {
+        if (za - ya < 1e-4 && zb - yb2 < 1e-4) return;
+        quad(g, [[R * cA, ya, R * sA], [R * cB, yb2, R * sB], [R * cB, zb, R * sB], [R * cA, za, R * sA]],
+          [[-cA, 0, -sA], [-cB, 0, -sB], [-cB, 0, -sB], [-cA, 0, -sA]], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      };
+      if (!has) emit(yA, yB, H, H);
+      else { emit(yA, yB, wa.lo, wb.lo); emit(wa.hi, wb.hi, H, H); }
+    }
+    add('wall', g); }
+  // dark glass behind the oval window and the low slit (we see the office beyond)
+  { const ao = ovalHx / R / D2R; ringFace('glassDark', R + 0.03, aScreen - ao, aScreen + ao, ovalYc - ovalHy, ovalYc + ovalHy, true, 2);
+    ringFace('glassDark', R + 0.03, LT0, K0, lensLo, Hb, true, 2); }
+  // black reveal at the wall top, black skirting, warm LED line
+  arcBlock('black', R - 0.04, R, 0, 360, H - 0.06, H, 'ib');
+  arcBlock('black', R - 0.04, R, K0, K1, Hb - 0.05, Hb, 'ib');
+  arcBlock('black', R - 0.012, R, SW, 360 + LT0, 0, 0.07, 'it');
+  arcBlock('led', R - 0.12, R - 0.06, 0, 360, H - 0.003, H - 0.002, 'b');
+
+  /* ---------- ceiling / soffit around the skylight ---------- */
+  const rin = (a) => (sky / 2) / Math.max(Math.abs(Math.cos(a * D2R)), Math.abs(Math.sin(a * D2R)));
+  polar('ceiling', H, rin, () => R, true);
+  for (let k = 0; k < 14; k++) {                                // recessed spot lights on the soffit
+    const a = 8 + k * (344 / 13), rr = R - 0.7, x = rr * Math.cos(a * D2R), z = rr * Math.sin(a * D2R);
+    if (Math.max(Math.abs(x), Math.abs(z)) > sky / 2 + 0.12) boxG('lamp', x, H - 0.006, z, 0.11, 0.012, 0.11, a);
+  }
+  // LED line along the skylight edge
+  for (let k = 0; k < 4; k++) {
+    const ang = k * 90, ca = Math.cos(ang * D2R), sa = Math.sin(ang * D2R);
+    boxG('led', ca * (sky / 2 + 0.05), H - 0.004, sa * (sky / 2 + 0.05), sky + 0.2, 0.006, 0.05, ang);
+  }
+
+  /* ---------- glass shaft above the skylight (seen through the opening) ---------- */
+  { const c = sky / 2, top = H + shaft;
+    const faces = [
+      { P: [[-c, H, -c], [c, H, -c], [c, top, -c], [-c, top, -c]], n: [0, 0, 1] },
+      { P: [[c, H, -c], [c, H, c], [c, top, c], [c, top, -c]], n: [-1, 0, 0] },
+      { P: [[c, H, c], [-c, H, c], [-c, top, c], [c, top, c]], n: [0, 0, -1] },
+      { P: [[-c, H, c], [-c, H, -c], [-c, top, -c], [-c, top, c]], n: [1, 0, 0] }];
+    for (const f of faces) { const g = newG(); quad(g, f.P, F4(f.n), [[0, 0], [1, 0], [1, 1], [0, 1]]); add('facade', g); }
+    const gt = newG(); quad(gt, [[-c, top, -c], [c, top, -c], [c, top, c], [-c, top, c]], F4([0, -1, 0]), [[0, 0], [1, 0], [1, 1], [0, 1]]); add('shaftTop', gt);
+    const cols = Math.max(3, Math.round(sky / 0.95)), rowH = sky / cols;
+    for (let k = 0; k < 4; k++) {
+      const ang = k * 90;
+      const ca = Math.cos((ang + 270) * D2R), sa = Math.sin((ang + 270) * D2R);
+      for (let i = 0; i <= cols; i++) {
+        const t = -c + sky * i / cols;
+        const x = ca * c + (-sa) * t, z = sa * c + ca * t;
+        boxG('alu', x - ca * 0.04, H + shaft / 2, z - sa * 0.04, 0.06, shaft, 0.08, ang + 270);
+      }
+      for (let m = 0; m * rowH <= shaft + 0.01; m++) {
+        const y = m * rowH; if (y > shaft + 0.001) continue;
+        boxG('alu', ca * c - ca * 0.04, H + y, sa * c - sa * 0.04, sky, 0.06, 0.08, ang + 270);
+      }
+    }
+  }
+
+  function wire(m, A, B, r) {            // thin square-section cable between two points
+    const d = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], dl = Math.hypot(d[0], d[1], d[2]); d[0] /= dl; d[1] /= dl; d[2] /= dl;
+    let u = [d[1] * 0 - d[2] * 1, d[2] * 0 - d[0] * 0, d[0] * 1 - d[1] * 0];   // d x up
+    let ul = Math.hypot(u[0], u[1], u[2]); if (ul < 1e-6) u = [1, 0, 0]; else u = [u[0] / ul, u[1] / ul, u[2] / ul];
+    const v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]];
+    const g = newG(), at = (P0, a, b) => [P0[0] + r * (a * u[0] + b * v[0]), P0[1] + r * (a * u[1] + b * v[1]), P0[2] + r * (a * u[2] + b * v[2])];
+    const sides = [[1, 0, 0, 1], [0, 1, -1, 0], [-1, 0, 0, -1], [0, -1, 1, 0]];   // normal(a,b) and tangent(a,b)
+    for (const s of sides) {
+      const n = [s[0] * u[0] + s[1] * v[0], s[0] * u[1] + s[1] * v[1], s[0] * u[2] + s[1] * v[2]];
+      const p = (P0, k) => at(P0, s[0] + k * s[2], s[1] + k * s[3]);
+      quad(g, [p(A, -1), p(A, 1), p(B, 1), p(B, -1)], F4(n), [[0, 0], [1, 0], [1, 1], [0, 1]]);
+    }
+    add(m, g);
+  }
+  /* ---------- 4 suspension cables: centre node of the cross -> mid-side anchors at the top of the glass shaft ---------- */
+  { const c = sky / 2, top = H + shaft, N = [0, H + 0.09, 0];
+    boxG('metal', 0, H + 0.07, 0, 0.14, 0.04, 0.14, 0);                       // node plate on the cross intersection
+    for (const s of [-1, 1]) {
+      boxG('metal', s * (c - 0.015), top - 0.08, 0, 0.03, 0.16, 0.16, 90);    // anchor plates on the x walls
+      boxG('metal', 0, top - 0.08, s * (c - 0.015), 0.03, 0.16, 0.16, 0);     // anchor plates on the z walls
+      wire('metal', N, [s * (c - 0.035), top - 0.08, 0], 0.003);
+      wire('metal', N, [0, top - 0.08, s * (c - 0.035)], 0.003);
+    }
+  }
+
+  /* ---------- aluminium frame around the skylight square: 8 x 4 cm section, 4 cm visible from below ---------- */
+  { const fw = 0.04, fh = 0.08, c = sky / 2, yc = H - 0.03 + fh / 2, off = 0.08;   // inset past the building's own frame (8 cm deep)
+    for (const s of [-1, 1]) {
+      boxG('skyFrame', 0, yc, s * (c - off - fw / 2), fw, fh, sky - 2 * off, 0);
+      boxG('skyFrame', s * (c - off - fw / 2), yc, 0, fw, fh, sky - 2 * off - 2 * fw, 90);
+    }
+    boxG('skyFrame', 0, yc, 0, fw, fh, sky - 2 * off - 2 * fw, 0);     // two cross bars splitting the opening into 4 squares
+    boxG('skyFrame', 0, yc, 0, fw, fh, sky - 2 * off - 2 * fw, 90);
+    { // 4 linear luminaires (white extruded housing + opal diffuser), one at the middle of each arm of the cross, fixed under the bar
+      const armMid = (fw / 2 + (c - off - fw)) / 2, ll = 1.0, hh = 0.025, hy = H - 0.03 - hh / 2, dy = H - 0.03 - hh - 0.002;
+      for (const s of [-1, 1]) {
+        boxG('linHouse', s * armMid, hy, 0, 0.036, hh, ll, 0);
+        boxG('linear', s * armMid, dy, 0, 0.024, 0.004, ll - 0.04, 0);
+        boxG('linHouse', 0, hy, s * armMid, 0.036, hh, ll, 90);
+        boxG('linear', 0, dy, s * armMid, 0.024, 0.004, ll - 0.04, 90);
+      }
+    }
+    { // 2 cm lip (bottom flange) on all four sides of each of the 4 squares, for the infill to sit on
+      const lw = 0.02, lt = 0.02, ly = H - 0.03 + lt / 2, e = c - off - fw, x0 = fw / 2, L = e - x0;
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        const cxm = sx * (x0 + L / 2), czm = sz * (x0 + L / 2);
+        for (const w of [0, 1]) {
+          boxG('skyFrame', cxm, ly, sz * (x0 + lw / 2 * (w ? -1 : 1) + (w ? L : 0)), lw, lt, L, 0);
+          boxG('skyFrame', sx * (x0 + lw / 2 * (w ? -1 : 1) + (w ? L : 0)), ly, czm, lw, lt, L - 2 * lw, 90);
+        }
+        const fi0 = items.length;
+        { // aluminium square frame resting on the lip, with a sky-blue flex sheet fixed under it
+          const S = L - 0.01, tf = 0.003, ft = 0.04, yf = H - 0.01, ya = yf + tf + ft / 2;
+          boxG('flex', cxm, yf + tf / 2, czm, S, tf, S, 0);
+          for (const q of [-1, 1]) {
+            boxG('alu', cxm, ya, czm + q * (S / 2 - ft / 2), ft, ft, S, 0);
+            boxG('alu', cxm + q * (S / 2 - ft / 2), ya, czm, ft, ft, S - 2 * ft, 90);
+          }
+        }
+        for (let q = fi0; q < items.length; q++) items[q].flex = true;
+      }
+    }
+  }
+
+  /* ---------- seating tiers (three curved levels, radial stairs at both ends) ---------- */
+  arcBlock('wood', r0, r1, T1a[0], T1a[1], 0, h1, 'iote');                    // tier 1 body (the front bench)
+  arcBlock('wood', r1 - 0.04, r1, T1a[0], T1a[1], h1, h2 - 0.05, 'iote');     // tier 1 back panel
+  arcBlock('wood', r1, r2, T2a[0], T2a[1], 0, h2, 'iote');                    // tier 2 platform
+  arcBlock('wood', r2 - 0.04, r2, T2a[0], T2a[1], h2, h3 - 0.05, 'iote');     // tier 2 back panel
+  arcBlock('wood', r2, r3, T3a[0], T3a[1], 0, h3, 'iote');                    // tier 3 platform
+  arcBlock('wood', r3 - 0.04, r3, T3a[0], T3a[1], h3, woodTop, 'iote');       // tier 3 back wall panel
+  // west flight: 3 steps in the tier-1 band, climbing outward to tier 2
+  for (let k = 1; k <= 3; k++) arcBlock('wood', r0 + (k - 1) * d / 3, r0 + k * d / 3, WF[0], WF[1], 0, k * h2 / 3, 'iote');
+  // east flight: 5 steps climbing outward through all three bands to tier 3
+  for (let k = 1; k <= 5; k++) arcBlock('wood', r0 + (k - 1) * (r3 - r0) / 5, r0 + k * (r3 - r0) / 5, EF[0], EF[1], 0, k * h3 / 5, 'iote');
+  // outlet plates on the tier-1 front face
+  for (const t of [0.14, 0.48, 0.82]) { const aa = a0 + (a1 - a0) * t; arcBlock('black', r0 - 0.004, r0, aa - 0.7, aa + 0.7, 0.16, 0.22, 'i'); }
+  // seat cushions
+  const seg = (rI, rO, y, list, aS, aE) => {
+    for (const q of list) { const sa = aS + (aE - aS) * q[0], ea = aS + (aE - aS) * q[1];
+      if (ea - sa > 0.2) arcBlock(q[2], rI, rO, sa, ea, y, y + 0.07, 'iot'); }
+  };
+  seg(r0 + 0.04, r1 - 0.16, h1, [[0.02, 0.57, 'cushG'], [0.57, 0.99, 'cushW']], a0, a1);
+  seg(r1 + 0.04, r2 - 0.16, h2, [[0.02, 0.45, 'cushW'], [0.45, 0.75, 'cushG'], [0.75, 0.98, 'cushD']], T2a[0], T2a[1]);
+  seg(r2 + 0.04, r3 - 0.16, h3, [[0.02, 0.08, 'cushD'], [0.08, 0.86, 'cushG'], [0.86, 0.99, 'cushW']], T3a[0], T3a[1]);
+  // back cushions on the tier-1 back panel
+  for (const bc of [[0.31, 0.44, 'cushD'], [0.45, 0.57, 'cushD'], [0.58, 0.70, 'cushW'], [0.86, 0.98, 'cushW']]) {
+    const sa = a0 + (a1 - a0) * bc[0], ea = a0 + (a1 - a0) * bc[1];
+    arcBlock(bc[2], r1 - 0.10, r1 - 0.04, sa, ea, h1 + 0.12, h1 + 0.46, 'iote');
+  }
+  // planter (leaf-shaped, in front of the east flight) and a small box at the west end
+  { const pa0 = EF[1] + 2, pa1 = EF[1] + 22, pr0 = r0 - 0.35, pr1 = r1 + 0.25;
+    arcBlock('wood', pr0, pr1, pa0, pa1, 0, 0.55, 'iote');
+    arcBlock('soil', pr0 + 0.05, pr1 - 0.05, pa0 + 1.4, pa1 - 1.4, 0.55, 0.58, 't');
+    for (let k = 0; k < 12; k++) {
+      const aa = pa0 + 3 + rnd() * (pa1 - pa0 - 6), rr = pr0 + 0.22 + rnd() * (pr1 - pr0 - 0.44), q = P3(aa, rr, 0.58);
+      const sz = 0.12 + rnd() * 0.13; blob('plant', q[0], 0.58 + sz * 0.8, q[2], sz * 1.4, sz, sz * 1.4);
+    } }
+  arcBlock('wood', r0 + 0.2, r1 + 0.45, T3a[0] - 6, T3a[0] + 5, 0, 0.72, 'iote');
+
+  /* ---------- projector screen under the bulkhead ---------- */
+  { const aw = scrW / R / D2R / 2, top = H - 0.08;
+    ringFace('screen', R - 0.07, aScreen - aw, aScreen + aw, top - scrH, top, true, 2);
+    arcBlock('screenCase', R - 0.12, R - 0.04, aScreen - aw - 0.4, aScreen + aw + 0.4, top - 0.02, top + 0.06, 'iote');
+    arcBlock('screenCase', R - 0.085, R - 0.06, aScreen - aw, aScreen + aw, top - scrH - 0.03, top - scrH, 'iotb'); }
+
+  /* ---------- glass wall with double doors (south side) ---------- */
+  ringFace('glass', R, K0, K1, 0.05, Hb, true, 3);
+  arcBlock('frame', R - 0.03, R + 0.03, K0, K1, 0, 0.05, 'iot');
+  arcBlock('frame', R - 0.03, R + 0.03, K0, K1, Hb - 0.05, Hb, 'iob');
+  { const n = Math.round((K1 - K0) * D2R * R / 1.2);
+    for (let i = 0; i <= n; i++) { const a = K0 + (K1 - K0) * i / n, q = P3(a, R - 0.005, Hb / 2); boxG('frame', q[0], Hb / 2, q[2], 0.05, Hb, 0.06, a); } }
+  { const dw = 0.9 / R / D2R;  // each leaf 0.9 m wide
+    ringFace('frost', R - 0.01, aDoor - dw, aDoor + dw, 0.05, 2.1, true, 2);
+    for (const a of [aDoor - dw, aDoor, aDoor + dw]) { const q = P3(a, R - 0.01, 1.05); boxG('frame', q[0], 1.05, q[2], 0.06, 2.1, 0.07, a); }
+    for (const a of [aDoor - 1.6, aDoor + 1.6]) { const hq = P3(a, R - 0.06, 1.05); boxG('metal', hq[0], 1.05, hq[2], 0.025, 0.7, 0.025, a); } }
+
+  /* ---------- the office seen through the glass and windows (hidden from far views) ---------- */
+  const RO = R + 5;
+  ringFace('backdrop', RO, 0, 360, 0, H, true, 5, true);
+  polar('outCeil', H, () => R, () => RO, true, true);
+  { const q = P3(100, R + 2.4, 0); arcBlock('column', 0, 0.36, 0, 360, 0, H, 'ot', true);
+    const it = items[items.length - 1]; it.g.p = it.g.p.map((v, i) => i % 3 === 0 ? v + q[0] : (i % 3 === 2 ? v + q[2] : v)); }
+  for (const f of [[140, R + 2.0, 0], [128, R + 2.8, 20], [155, R + 2.6, -10], [200, R + 2.0, 0], [226, R + 2.6, 40], [60, R + 2.2, 10]]) {
+    const q = P3(f[0], f[1], 0); boxG('furn', q[0], 0.38, q[2], 1.6, 0.76, 0.8, f[0] + f[2], true); boxG('chair', q[0] + 0.5, 0.45, q[2] + 0.7, 0.5, 0.9, 0.5, f[0], true); }
+
+  /* ---------- dimension lines and labels ---------- */
+  const L = (text, pos, kind) => labels.push({ text, pos, kind: kind || '' });
+  lines.push([[-sky / 2, H + 0.02, -sky / 2], [sky / 2, H + 0.02, -sky / 2]]);
+  L('المنور ' + sky.toFixed(2) + ' م', [0, H + 0.08, -sky / 2], 'given');
+  lines.push([[-R, 0.03, 0], [R, 0.03, 0]]);
+  L('قطر الغرفة ' + (2 * R).toFixed(2) + ' م', [-R * 0.45, 0.08, 0]);
+  { const q = P3(270, R - 0.1, 0); lines.push([[q[0], 0, q[2]], [q[0], H, q[2]]]); L('ارتفاع الجدار ' + H.toFixed(2) + ' م', [q[0], H * 0.5, q[2]]); }
+  L('فريم ألمنيوم 8×4 سم', [0, H + 0.1, 0]);
+  L('المربع الصافي ' + ((sky - 0.12) / 2).toFixed(2) + ' م', [sky / 4, H + 0.1, sky / 4]);
+  { const am = ac;
+    for (const t of [[r0, h1], [r1, h2], [r2, h3]]) { const q = P3(am, t[0], t[1]); L(t[1].toFixed(2), q, 'step'); }
+    const q1 = P3(am + 4, r0, 0.02), q2 = P3(am + 4, r3, 0.02); lines.push([q1, q2]); L('عمق الدرجات ' + (3 * d).toFixed(2) + ' م', P3(am + 4, (r0 + r3) / 2, 0.08)); }
+
+  return { items, labels, lines, info: { R, H, r0, r1, r2, r3, a0, a1, ac, T3a, EF, WF, h1, h2, h3, Hb, sky, shaft, aScreen, aDoor, K0, K1 } };
+}
+/*GEOM-END*/
+
+/* ======================= render layer ======================= */
+(function () {
+  const THREE = window.THREE;
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('c');
+  if (!THREE) { $('hint').textContent = 'تعذر تحميل مكتبة العرض ثلاثي الأبعاد. تأكد من الاتصال وأعد فتح الصفحة.'; return; }
+  const DEF = { sky: 5.7, shaft: 3.8, R: 5.0, H: 2.9, h1: 0.45, step: 0.55, depth: 0.8, scrW: 2.1, scrH: 1.45 };
+  let P = Object.assign({}, DEF);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x12161a);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 120);
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+
+  /* ---------- lights ---------- */
+  scene.add(new THREE.AmbientLight(0xffffff, 0.34));
+  scene.add(new THREE.HemisphereLight(0xf5f7fa, 0x7a6f66, 0.36));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.28); sun.position.set(2, 9, 4); scene.add(sun);
+  const warm = [];
+  function addPoint(x, y, z, i, dist, col) { const l = new THREE.PointLight(col || 0xfff1dc, i, dist); l.position.set(x, y, z); scene.add(l); warm.push(l); }
+  addPoint(0, 2.6, 0, 0.36, 11);
+  for (let k = 0; k < 6; k++) { const a = k * 60 * Math.PI / 180; addPoint(Math.cos(a) * 3.4, 2.7, Math.sin(a) * 3.4, 0.15, 7, 0xffe6c4); }
+  addPoint(0, 6.0, 0, 0.34, 12, 0xeaf2ff);
+  for (const q of [[1.4, 0], [-1.4, 0], [0, 1.4], [0, -1.4]]) { const sl = new THREE.SpotLight(0xffe9c8, 0.9, 7, 1.15, 0.85, 2); sl.position.set(q[0], 2.84, q[1]); sl.target.position.set(q[0], 0, q[1]); scene.add(sl); scene.add(sl.target); }
+
+  /* ---------- textures ---------- */
+  const cv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const mkTex = (c, repeat) => { const t = new THREE.CanvasTexture(c); if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso; return t; };
+  function woodTex() {
+    const c = cv(512, 512), x = c.getContext('2d'), r = mulberry(7);
+    x.fillStyle = '#c59c69'; x.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 1100; i++) {
+      const y = r() * 512, len = 40 + r() * 320, xx = r() * 512, a = 0.03 + r() * 0.08, h = 1 + r() * 1.6;
+      x.fillStyle = r() < 0.5 ? 'rgba(118,76,40,' + a + ')' : 'rgba(236,208,164,' + a + ')';
+      x.fillRect(xx, y, len, h); if (xx + len > 512) x.fillRect(xx - 512, y, len, h);
+    }
+    for (let i = 0; i < 22; i++) { const y = r() * 512, g = x.createLinearGradient(0, y - 30, 0, y + 30); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.5, 'rgba(110,70,36,0.10)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, y - 30, 512, 60); }
+    return mkTex(c, true);
+  }
+  function floorTex(Rv) {
+    const S = 2048, c = cv(S, S), x = c.getContext('2d'), k = S / 20, r = mulberry(21);
+    const mottle = (cols, n, rmin, rmax) => { for (let i = 0; i < n; i++) { x.globalAlpha = 0.05 + r() * 0.06; x.fillStyle = cols[r() < 0.5 ? 0 : 1]; x.beginPath(); x.ellipse(r() * S, r() * S, rmin + r() * rmax, rmin + r() * rmax, r() * 3, 0, 6.283); x.fill(); } x.globalAlpha = 1; };
+    x.fillStyle = '#3f4347'; x.fillRect(0, 0, S, S); mottle(['#2e3134', '#52575b'], 1800, 10, 60);
+    x.strokeStyle = 'rgba(0,0,0,0.30)'; x.lineWidth = 2;
+    for (let t = -10; t <= 10.001; t += 0.6) { x.beginPath(); x.moveTo((t + 10) * k, 0); x.lineTo((t + 10) * k, S); x.stroke(); x.beginPath(); x.moveTo(0, (t + 10) * k); x.lineTo(S, (t + 10) * k); x.stroke(); }
+    x.save(); x.beginPath(); x.arc(10 * k, 10 * k, (Rv - 1.2) * k, 0, 6.2832); x.clip();
+    x.fillStyle = '#8c929b'; x.fillRect(0, 0, S, S); mottle(['#767c85', '#a7adb6'], 2600, 14, 80);
+    x.strokeStyle = 'rgba(70,76,86,0.38)'; x.lineWidth = 2;
+    for (let row = 0, t = -10; t < 10; t += 0.6, row++) {
+      x.beginPath(); x.moveTo(0, (t + 10) * k); x.lineTo(S, (t + 10) * k); x.stroke();
+      for (let u = -10 + (row % 2) * 0.6; u < 10; u += 1.2) { x.beginPath(); x.moveTo((u + 10) * k, (t + 10) * k); x.lineTo((u + 10) * k, (t + 10.6) * k); x.stroke(); }
+    }
+    x.restore();
+    return mkTex(c, false);
+  }
+  function facadeTex(sky, shaft) {
+    const cols = Math.max(3, Math.round(sky / 0.95)), cwM = sky / cols, ppm = 170, W = Math.round(sky * ppm), Hh = Math.round(shaft * ppm);
+    const c = cv(W, Hh), x = c.getContext('2d'), r = mulberry(5), cw = cwM * ppm, rows = Math.ceil(shaft / cwM);
+    x.fillStyle = '#4f5d5b'; x.fillRect(0, 0, W, Hh);
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const x0 = i * cw, y0 = Hh - (j + 1) * cw, tone = 70 + Math.floor(r() * 16);
+      const g = x.createLinearGradient(0, y0, 0, y0 + cw);
+      g.addColorStop(0, 'rgb(' + (tone + 18) + ',' + (tone + 32) + ',' + (tone + 30) + ')'); g.addColorStop(1, 'rgb(' + (tone - 12) + ',' + (tone + 2) + ',' + (tone + 1) + ')');
+      x.fillStyle = g; x.fillRect(x0, y0, cw, cw);
+      const n = 1 + Math.floor(r() * 2);
+      for (let k = 0; k < n; k++) { x.fillStyle = 'rgba(214,232,246,' + (0.55 + r() * 0.35) + ')'; const w = 0.34 * ppm, h = 0.34 * ppm; x.fillRect(x0 + 0.08 * ppm + r() * (cw - w - 0.16 * ppm), y0 + 0.06 * ppm + r() * (cw * 0.5 - h * 0.5), w, h); }
+      if (r() < 0.18) { x.fillStyle = 'rgba(70,125,70,0.55)'; x.beginPath(); x.ellipse(x0 + cw * 0.5, y0 + cw * 0.86, 0.22 * ppm, 0.17 * ppm, 0, 0, 6.28); x.fill(); }
+      x.fillStyle = 'rgba(255,255,255,0.05)'; for (let b = 0; b < cw; b += 6) x.fillRect(x0, y0 + b, cw, 1);
+    }
+    return mkTex(c, false);
+  }
+  function topTex() {
+    const c = cv(512, 512), x = c.getContext('2d'); x.fillStyle = '#cfd4d6'; x.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { x.fillStyle = (i + j) % 3 === 0 ? '#ffffff' : '#dde2e4'; x.fillRect(i * 64 + 3, j * 64 + 3, 58, 58); }
+    return mkTex(c, false);
+  }
+  function backdropTex() {
+    const c = cv(1024, 256), x = c.getContext('2d'), r = mulberry(3);
+    const g = x.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, '#4a525b'); g.addColorStop(1, '#2a3037'); x.fillStyle = g; x.fillRect(0, 0, 1024, 256);
+    for (let i = 0; i < 40; i++) { x.fillStyle = r() < 0.5 ? 'rgba(230,238,245,0.55)' : 'rgba(255,225,180,0.45)'; x.fillRect(r() * 1000, 30 + r() * 120, 18 + r() * 60, 20 + r() * 40); }
+    return mkTex(c, true);
+  }
+  let TX = {};
+
+  /* ---------- materials ---------- */
+  function makeMats() {
+    const S = THREE.MeshStandardMaterial, B = THREE.MeshBasicMaterial;
+    const lit = (color, rough, extra) => new S(Object.assign({ color, roughness: rough, metalness: 0 }, extra || {}));
+    const glass = (color, op, extra) => new S(Object.assign({ color, roughness: 0.1, metalness: 0.2, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false }, extra || {}));
+    return {
+      floor: lit(0xffffff, 0.55, { map: TX.floor }),
+      wall: lit(0xf1efe9, 0.95),
+      wood: lit(0xffffff, 0.6, { map: TX.wood }),
+      black: lit(0x15181a, 0.55),
+      led: new B({ color: 0xffd9a3 }),
+    linear: new B({ color: 0xfffaf0 }),
+    linHouse: lit(0xe9e9e6, 0.45, { metalness: 0.3 }),
+      lamp: new B({ color: 0xfff6e0 }),
+      ceiling: lit(0xf3f1ec, 1, { emissive: 0x1b1812 }),
+      cushG: lit(0x86a63c, 0.45), cushW: lit(0xf2f0ea, 0.6), cushD: lit(0x2e3234, 0.6),
+      soil: lit(0x6e3a2a, 1), plant: lit(0x3f8a35, 0.8),
+      screen: lit(0xeceae5, 0.9, { emissive: 0x222220 }), screenCase: lit(0xd4d2cc, 0.7),
+      glassDark: lit(0x1c2427, 0.2, { metalness: 0.3 }),
+      glass: glass(0x3a4a50, 0.22), frost: glass(0xf0f3f5, 0.82),
+      frame: lit(0x2a2e30, 0.4, { metalness: 0.6 }), metal: lit(0xb9bdbf, 0.3, { metalness: 0.8 }),
+      flex: lit(0xa9d3ec, 0.7, { emissive: 0xa9d3ec, emissiveIntensity: 0.3 }),
+      skyFrame: lit(0xb8995f, 0.35, { metalness: 0.55 }),
+    alu: lit(0x9aa09e, 0.45, { metalness: 0.5 }),
+      facade: lit(0xffffff, 0.4, { map: TX.facade, emissive: 0xffffff, emissiveMap: TX.facade, emissiveIntensity: 0.5 }),
+      shaftTop: new B({ map: TX.top }),
+      backdrop: new B({ map: TX.backdrop }),
+      outCeil: lit(0xb9bec0, 1, { emissive: 0x15181a }),
+      column: lit(0x86a05f, 0.7), furn: lit(0x5d646a, 0.7), chair: lit(0x1d2022, 0.7)
+    };
+  }
+
+  /* ---------- scene build ---------- */
+  let shaftOn = true, shaftMeshes = [], flexOn = true, flexMeshes = [];
+  function shaftShow(v) { shaftOn = v; shaftMeshes.forEach(m => { m.visible = v; }); const b = $('btnShaft'); if (b) { b.setAttribute('aria-pressed', String(v)); } }
+  let group = null, mats = null, dimGroup = null, dimLabels = [], INFO = null, outsideMeshes = [], dimsOn = false;
+  function disposeAll() {
+    if (group) { group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); scene.remove(group); }
+    if (mats) Object.keys(mats).forEach(k => mats[k].dispose());
+    Object.keys(TX).forEach(k => TX[k] && TX[k].dispose());
+    $('labels').innerHTML = '';
+  }
+  function build() {
+    disposeAll();
+    TX = { wood: woodTex(), floor: floorTex(P.R), facade: facadeTex(P.sky, P.shaft), top: topTex(), backdrop: backdropTex() };
+    TX.backdrop.repeat.set(1 / 6, 1 / P.H);
+    mats = makeMats();
+    const M = buildModel(P); INFO = M.info;
+    group = new THREE.Group(); outsideMeshes = []; shaftMeshes = []; flexMeshes = [];
+    for (const it of M.items) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(it.g.p, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(it.g.n, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(it.g.u, 2));
+      geo.setIndex(it.g.i);
+      const mat = mats[it.m] || mats.wall;
+      const mesh = new THREE.Mesh(geo, mat);
+      if (it.m === 'glass' || it.m === 'frost') mesh.renderOrder = 2;
+      group.add(mesh); if (it.out) outsideMeshes.push(mesh); if (it.shaft) { shaftMeshes.push(mesh); mesh.visible = shaftOn; } if (it.flex) { flexMeshes.push(mesh); mesh.visible = flexOn; }
+    }
+    if (M.items.some(i => i.m === 'backdrop')) { /* uv for backdrop are metres along the arc, 6 m per texture tile */ }
+    // wood: texture tile is 1 m; backdrop: tile 6 m wide and the full wall height
+    dimGroup = new THREE.Group();
+    const lm = new THREE.LineBasicMaterial({ color: 0xe0a867, depthTest: false, transparent: true });
+    for (const ln of M.lines) {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([].concat(ln[0], ln[1]), 3));
+      const l = new THREE.Line(g, lm); l.renderOrder = 10; dimGroup.add(l);
+    }
+    group.add(dimGroup); dimGroup.visible = dimsOn;
+    scene.add(group);
+    dimLabels = M.labels.map(L => { const el = document.createElement('div'); el.className = 'dim ' + (L.kind || ''); el.textContent = L.text; el.hidden = !dimsOn; $('labels').appendChild(el); return { el, pos: new THREE.Vector3(L.pos[0], L.pos[1], L.pos[2]) }; });
+  }
+
+  /* ---------- camera control ---------- */
+  const view = { mode: 'walk', pos: new THREE.Vector3(), yaw: 0, pitch: 0 };
+  const orb = { t: new THREE.Vector3(0, 1, 0), th: 0, ph: 1, d: 12 };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  function applyWalk() { camera.position.copy(view.pos); camera.rotation.order = 'YXZ'; camera.rotation.set(view.pitch, view.yaw, 0); }
+  function applyOrbit() {
+    const sp = Math.sin(orb.ph);
+    camera.position.set(orb.t.x + orb.d * sp * Math.sin(orb.th), orb.t.y + orb.d * Math.cos(orb.ph), orb.t.z + orb.d * sp * Math.cos(orb.th));
+    camera.rotation.order = 'XYZ'; camera.up.set(0, 1, 0); camera.lookAt(orb.t);
+  }
+  function setWalk(pos, tgt) {
+    view.mode = 'walk'; document.body.classList.add('walk'); camera.fov = 72; camera.updateProjectionMatrix();
+    view.pos.set(pos[0], pos[1], pos[2]);
+    const dx = tgt[0] - pos[0], dy = tgt[1] - pos[1], dz = tgt[2] - pos[2];
+    view.yaw = Math.atan2(-dx, -dz); view.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+    applyWalk(); hint();
+  }
+  function setOrbit(o) {
+    view.mode = 'orbit'; document.body.classList.remove('walk'); camera.fov = 45; camera.updateProjectionMatrix();
+    orb.t.set(o.t[0], o.t[1], o.t[2]); orb.th = o.th; orb.ph = o.ph; orb.d = o.d; applyOrbit(); hint();
+  }
+  function hint() { $('hint').textContent = ''; }
+  const D = Math.PI / 180;
+  const pp = (a, r, y) => [r * Math.cos(a * D), y, r * Math.sin(a * D)];
+  const PRESETS = [
+    { id: 'general', name: 'General Perspective', go: () => { const a = INFO.ac * D; setOrbit({ t: [3 * Math.cos(a), 1.6, 3 * Math.sin(a)], th: Math.atan2(-Math.cos(a), -Math.sin(a)), ph: Math.PI / 2, d: 3 }); } }
+  ];
+  let curPreset = 'general';
+  function buildDock() {
+    const dock = $('dock'); dock.innerHTML = '';
+    PRESETS.forEach(p => {
+      const b = document.createElement('button'); b.className = 'chip'; b.textContent = p.name; b.setAttribute('aria-pressed', String(p.id === curPreset));
+      b.addEventListener('click', () => { curPreset = p.id; p.go(); [...dock.children].forEach((c, i) => c.setAttribute('aria-pressed', String(PRESETS[i].id === curPreset))); });
+      dock.appendChild(b);
+    });
+  }
+
+  /* pointer input */
+  const ptrs = new Map(); let pinch = 0;
+  canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, b: e.button }); canvas.classList.add('drag'); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); } });
+  canvas.addEventListener('pointerup', e => { ptrs.delete(e.pointerId); if (!ptrs.size) canvas.classList.remove('drag'); });
+  canvas.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); canvas.classList.remove('drag'); });
+  canvas.addEventListener('pointermove', e => {
+    const p = ptrs.get(e.pointerId); if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+    if (ptrs.size === 2 && view.mode === 'orbit') { const [a, b] = [...ptrs.values()]; const nd = Math.hypot(a.x - b.x, a.y - b.y); orb.d = clamp(orb.d * pinch / Math.max(nd, 1), 0.3, 80); pinch = nd; const k2 = orb.d * 0.0008, r2 = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0), u2 = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1); orb.t.addScaledVector(r2, -dx * k2).addScaledVector(u2, dy * k2); applyOrbit(); return; }
+    if (view.mode === 'walk') { view.yaw -= dx * 0.0042; view.pitch = clamp(view.pitch - dy * 0.0042, -1.55, 1.55); applyWalk(); }
+    else if (p.b === 2 || e.shiftKey) {
+      const k = orb.d * 0.0016, r = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0), u = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+      orb.t.addScaledVector(r, -dx * k).addScaledVector(u, dy * k); applyOrbit();
+    } else { orb.th -= dx * 0.006; orb.ph = clamp(orb.ph - dy * 0.006, 0.01, Math.PI - 0.01); applyOrbit(); }
+  });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (view.mode === 'orbit') { orb.d = clamp(orb.d * Math.exp(e.deltaY * 0.0012), 0.3, 80); applyOrbit(); }
+    else { const cp = Math.cos(view.pitch), f = new THREE.Vector3(-Math.sin(view.yaw) * cp, Math.sin(view.pitch), -Math.cos(view.yaw) * cp); view.pos.addScaledVector(f, -e.deltaY * 0.004); constrain(); applyWalk(); }
+  }, { passive: false });
+  const keys = {};
+  const KM = {};
+  window.addEventListener('keydown', e => { if (e.target && e.target.tagName === 'INPUT') return; if (KM[e.code]) { keys[KM[e.code]] = true; if ((e.code.indexOf('Arrow') === 0 || e.code === 'Space')) e.preventDefault(); } });
+  window.addEventListener('keyup', e => { if (KM[e.code]) keys[KM[e.code]] = false; });
+  document.querySelectorAll('#pad button').forEach(b => {
+    const k = b.dataset.k; b.addEventListener('pointerdown', e => { keys[k] = true; e.preventDefault(); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => { keys[k] = false; }));
+  });
+  function constrain() { /* free flight: no walls, no height limit, only keep above the floor */
+    if (view.pos.y < 0.1) view.pos.y = 0.1;
+  }
+
+  /* ---------- UI: flex toggle ---------- */
+  function flexShow(v) { flexOn = v; flexMeshes.forEach(m => { m.visible = v; }); const b = $('btnFlex'); if (b) { b.setAttribute('aria-pressed', String(v)); b.textContent = v ? 'Hide Ceiling' : 'Show Ceiling'; } }
+  $('btnFlex').addEventListener('click', () => flexShow(!flexOn));
+
+  /* ---------- loop ---------- */
+  function resize() { const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  window.addEventListener('resize', resize);
+  let last = performance.now();
+  const tmp = new THREE.Vector3();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (view.mode === 'orbit') {
+      const f = (keys.f ? 1 : 0) - (keys.b ? 1 : 0), s = (keys.r ? 1 : 0) - (keys.l ? 1 : 0), v = (keys.u ? 1 : 0) - (keys.dn ? 1 : 0);
+      if (f || s || v) {
+        const sp = Math.max(0.5, orb.d * 0.5) * dt, fw = new THREE.Vector3().subVectors(orb.t, camera.position).normalize();
+        const rt = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+        orb.t.addScaledVector(fw, f * sp).addScaledVector(rt, s * sp); orb.t.y += v * sp; applyOrbit();
+      }
+    }
+    if (view.mode === 'walk') {
+      const sp = 1.7 * dt, f = (keys.f ? 1 : 0) - (keys.b ? 1 : 0), s = (keys.r ? 1 : 0) - (keys.l ? 1 : 0), v = (keys.u ? 1 : 0) - (keys.dn ? 1 : 0);
+      if (f || s || v) {
+        const cp = Math.cos(view.pitch);
+        view.pos.x += (-Math.sin(view.yaw) * cp * f + Math.cos(view.yaw) * s) * sp;
+        view.pos.z += (-Math.cos(view.yaw) * cp * f - Math.sin(view.yaw) * s) * sp;
+        view.pos.y += (Math.sin(view.pitch) * f + v) * sp;
+        constrain(); applyWalk();
+      }
+    }
+    const far = camera.position.length() > P.R + 1.5 || camera.position.y > P.H + 3;
+    outsideMeshes.forEach(m => { m.visible = !far; });
+    if (dimsOn) {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      dimLabels.forEach(l => {
+        tmp.copy(l.pos).project(camera);
+        const ok = tmp.z > -1 && tmp.z < 1 && Math.abs(tmp.x) < 1.1 && Math.abs(tmp.y) < 1.1;
+        l.el.style.display = ok ? '' : 'none';
+        if (ok) { l.el.style.left = ((tmp.x * 0.5 + 0.5) * w) + 'px'; l.el.style.top = ((-tmp.y * 0.5 + 0.5) * h) + 'px'; }
+      });
+    }
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('error', ev => { console.error('render error:', ev.message); });
+  try { build(); } catch (err) { console.error('build failed:', err); throw err; }
+  buildDock(); resize();
+  PRESETS[0].go();
+  requestAnimationFrame(frame);
+  window.__atrium = { go: (id) => { const p = PRESETS.find(x => x.id === id); if (p) { curPreset = id; p.go(); } }, P: () => P, camera };
+})();
+
+</script>
